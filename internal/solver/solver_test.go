@@ -5,7 +5,9 @@ package solver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -14,9 +16,12 @@ import (
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 const testNamespace = "customer-a"
@@ -130,6 +135,89 @@ func TestCleanUpOfMissingRecordSucceeds(t *testing.T) {
 	if err := s.CleanUp(challenge(t, baseConfig(url), "_acme-challenge.example.com.", "example.com.", "key-1")); err != nil {
 		t.Fatalf("CleanUp: %v", err)
 	}
+}
+
+// Without access to the zone there is nothing CleanUp could remove. An error
+// would keep the Challenge's finalizer and block deleting its namespace, so
+// CleanUp succeeds, while Present still reports the problem.
+func TestCleanUpWithoutAccessSucceeds(t *testing.T) {
+	forbidden := func(kube *fake.Clientset) {
+		kube.PrependReactor("get", "secrets", func(k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewForbidden(corev1.Resource("secrets"), "poweradmin", errors.New("RBAC"))
+		})
+	}
+	validKey := []*corev1.Secret{secret(testNamespace, "poweradmin", "api-key", "test-key")}
+	tests := []struct {
+		name    string
+		secrets []*corev1.Secret
+		react   func(*fake.Clientset)
+		zones   []string
+		status  int
+		config  map[string]any
+	}{
+		{name: "invalid config", secrets: validKey, config: map[string]any{"baseURL": "dns.example.com"}},
+		{name: "missing secret"},
+		{name: "secret not readable", secrets: validKey, react: forbidden},
+		{name: "secret without the key", secrets: []*corev1.Secret{secret(testNamespace, "poweradmin", "other", "test-key")}},
+		{name: "empty key", secrets: []*corev1.Secret{secret(testNamespace, "poweradmin", "api-key", " \n")}},
+		{name: "rejected API key", secrets: []*corev1.Secret{secret(testNamespace, "poweradmin", "api-key", "wrong-key")}},
+		{name: "API key without permission", secrets: validKey, status: http.StatusForbidden},
+		{name: "zone the key cannot access", secrets: validKey, zones: []string{"example.org"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			zones := tt.zones
+			if zones == nil {
+				zones = []string{"example.com"}
+			}
+			api, srv := newFakeAPI(t, zones...)
+			api.status = tt.status
+			kube := fake.NewClientset()
+			for _, o := range tt.secrets {
+				if _, err := kube.CoreV1().Secrets(o.Namespace).Create(t.Context(), o, metav1.CreateOptions{}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tt.react != nil {
+				tt.react(kube)
+			}
+			cfg := tt.config
+			if cfg == nil {
+				cfg = baseConfig(srv.URL)
+			}
+			s := NewWithClient(kube, srv.Client())
+			ch := challenge(t, cfg, "_acme-challenge.example.com.", "example.com.", "key-1")
+
+			if err := s.Present(ch); err == nil {
+				t.Error("Present succeeded, want the access error")
+			}
+			if err := s.CleanUp(ch); err != nil {
+				t.Errorf("CleanUp: %v, want nil", err)
+			}
+		})
+	}
+}
+
+// Transient failures must reach cert-manager so it retries the clean-up.
+func TestCleanUpReturnsTransientErrors(t *testing.T) {
+	t.Run("Poweradmin unavailable", func(t *testing.T) {
+		s, api, url := newTestSolver(t, "example.com")
+		api.status = http.StatusInternalServerError
+		if err := s.CleanUp(challenge(t, baseConfig(url), "_acme-challenge.example.com.", "example.com.", "key-1")); err == nil {
+			t.Error("CleanUp succeeded, want the 500")
+		}
+	})
+	t.Run("Kubernetes API unavailable", func(t *testing.T) {
+		_, srv := newFakeAPI(t, "example.com")
+		kube := fake.NewClientset(secret(testNamespace, "poweradmin", "api-key", "test-key"))
+		kube.PrependReactor("get", "secrets", func(k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewServiceUnavailable("etcd is down")
+		})
+		s := NewWithClient(kube, srv.Client())
+		if err := s.CleanUp(challenge(t, baseConfig(srv.URL), "_acme-challenge.example.com.", "example.com.", "key-1")); err == nil {
+			t.Error("CleanUp succeeded, want the Kubernetes error")
+		}
+	})
 }
 
 func TestCleanUpKeepsRecordsItDidNotCreate(t *testing.T) {

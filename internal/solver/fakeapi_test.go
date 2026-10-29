@@ -29,6 +29,9 @@ type fakeAPI struct {
 	quoteContents bool
 	// onGet runs before every RRset read, to simulate concurrent writers.
 	onGet func()
+	// status, when set, answers every authenticated request, to simulate
+	// outages and missing permissions.
+	status int
 }
 
 type fakeRRSet struct {
@@ -65,6 +68,11 @@ func (f *fakeAPI) serve(w http.ResponseWriter, r *http.Request) {
 
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	if f.status != 0 {
+		writeError(w, f.status, http.StatusText(f.status))
+		return
+	}
 
 	switch {
 	case r.Method == http.MethodGet && path == "zones":

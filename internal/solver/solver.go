@@ -24,6 +24,7 @@ import (
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook"
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/contentways/poweradmin-go/v4/poweradmin"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -147,12 +148,24 @@ func (s *Solver) Present(ch *v1alpha1.ChallengeRequest) error {
 
 // CleanUp removes only this challenge's key from the TXT RRset and deletes the
 // RRset once no value is left. A record that is already gone is not an error.
+//
+// Without access to the zone (invalid config, missing Secret, rejected API key,
+// unknown zone) there is nothing CleanUp could remove, and an error would keep
+// the Challenge's finalizer, and with it the Challenge and its namespace,
+// forever. CleanUp then logs the reason and succeeds; transient errors are
+// still returned so cert-manager retries.
 func (s *Solver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
 	target, err := s.prepare(ctx, ch)
 	if err != nil {
+		var noAccess *accessError
+		if errors.As(err, &noAccess) {
+			klog.InfoS("skipping clean-up without access to the zone; remove the record by hand if it was presented",
+				"fqdn", normalize(ch.ResolvedFQDN), "namespace", ch.ResourceNamespace, "reason", err.Error())
+			return nil
+		}
 		return err
 	}
 
@@ -241,11 +254,32 @@ func (t *target) put(ctx context.Context, ttl int, records []poweradmin.RRSetRec
 	return nil
 }
 
+// accessError marks a failure that retrying does not fix: the issuer's config,
+// its Secret or its API key give no access to a zone for the record.
+type accessError struct {
+	err error
+}
+
+func (e *accessError) Error() string { return e.err.Error() }
+
+func (e *accessError) Unwrap() error { return e.err }
+
+func noAccess(err error) error {
+	return &accessError{err: err}
+}
+
+// isAccessDenied reports whether Poweradmin rejected the API key.
+func isAccessDenied(err error) bool {
+	var apiErr *poweradmin.APIError
+	return errors.As(err, &apiErr) &&
+		(apiErr.StatusCode == http.StatusUnauthorized || apiErr.StatusCode == http.StatusForbidden)
+}
+
 // prepare loads the issuer configuration and API key and finds the zone.
 func (s *Solver) prepare(ctx context.Context, ch *v1alpha1.ChallengeRequest) (*target, error) {
 	cfg, err := LoadConfig(ch.Config)
 	if err != nil {
-		return nil, err
+		return nil, noAccess(err)
 	}
 	apiKey, err := s.apiKey(ctx, ch.ResourceNamespace, cfg)
 	if err != nil {
@@ -272,15 +306,19 @@ func (s *Solver) apiKey(ctx context.Context, namespace string, cfg Config) (stri
 	ref := cfg.APIKeySecretRef
 	secret, err := s.kube.CoreV1().Secrets(namespace).Get(ctx, ref.Name, metav1.GetOptions{})
 	if err != nil {
-		return "", fmt.Errorf("reading Secret %s/%s: %w", namespace, ref.Name, err)
+		wrapped := fmt.Errorf("reading Secret %s/%s: %w", namespace, ref.Name, err)
+		if apierrors.IsNotFound(err) || apierrors.IsForbidden(err) {
+			return "", noAccess(wrapped)
+		}
+		return "", wrapped
 	}
 	value, ok := secret.Data[ref.Key]
 	if !ok {
-		return "", fmt.Errorf("secret %s/%s has no key %q", namespace, ref.Name, ref.Key)
+		return "", noAccess(fmt.Errorf("secret %s/%s has no key %q", namespace, ref.Name, ref.Key))
 	}
 	key := strings.TrimSpace(string(value))
 	if key == "" {
-		return "", fmt.Errorf("key %q in Secret %s/%s is empty", ref.Key, namespace, ref.Name)
+		return "", noAccess(fmt.Errorf("key %q in Secret %s/%s is empty", ref.Key, namespace, ref.Name))
 	}
 	return key, nil
 }
@@ -381,11 +419,14 @@ func findZone(ctx context.Context, client *poweradmin.Client, configured, resolv
 		if err == nil {
 			return zone, nil
 		}
+		if isAccessDenied(err) {
+			return nil, noAccess(fmt.Errorf("looking up zone %s: %w", name, err))
+		}
 		if !poweradmin.IsNotFound(err) {
 			return nil, fmt.Errorf("looking up zone %s: %w", name, err)
 		}
 	}
-	return nil, fmt.Errorf("no Poweradmin zone found for %s (tried %s); check that the API key may access the zone", fqdn, strings.Join(candidates, ", "))
+	return nil, noAccess(fmt.Errorf("no Poweradmin zone found for %s (tried %s); check that the API key may access the zone", fqdn, strings.Join(candidates, ", ")))
 }
 
 // normalize turns a DNS name into the form Poweradmin stores: lower case,

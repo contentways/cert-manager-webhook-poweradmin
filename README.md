@@ -118,6 +118,14 @@ The webhook needs read access to these Secrets. The Helm chart grants it either
 cluster-wide or only in a list of namespaces; see the chart's
 `secretAccess` values.
 
+Clean-up does not block deleting a namespace. When the webhook has no access
+to the zone, because the Secret is gone or unreadable, the API key is rejected
+or the zone is not shared with the key, there is nothing it could remove: it
+logs `skipping clean-up without access to the zone` with the record name and
+lets cert-manager delete the Challenge. If the record had been presented
+before the access was lost, remove it in Poweradmin by hand. Transient errors,
+such as an unavailable Poweradmin, are still retried.
+
 ### CNAME delegation
 
 If the API key should not be able to change a customer's main zone, delegate
