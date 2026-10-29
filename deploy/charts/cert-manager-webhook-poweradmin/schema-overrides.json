@@ -1,0 +1,89 @@
+{
+  "global.compatibility.openshift.adaptSecurityContext": {
+    "enum": [
+      "auto",
+      "force",
+      "disabled"
+    ]
+  },
+  "image.pullPolicy": {
+    "enum": [
+      "Always",
+      "IfNotPresent",
+      "Never"
+    ]
+  },
+  "resourcesPreset": {
+    "enum": [
+      "none",
+      "nano",
+      "micro",
+      "small",
+      "medium",
+      "large",
+      "xlarge",
+      "2xlarge"
+    ]
+  },
+  "terminationGracePeriodSeconds": {
+    "type": [
+      "string",
+      "integer"
+    ]
+  },
+  "pdb.minAvailable": {
+    "type": [
+      "string",
+      "integer"
+    ]
+  },
+  "pdb.maxUnavailable": {
+    "type": [
+      "string",
+      "integer"
+    ]
+  },
+  "service.type": {
+    "enum": [
+      "ClusterIP",
+      "NodePort",
+      "LoadBalancer"
+    ]
+  },
+  "podAffinityPreset": {
+    "enum": [
+      "",
+      "soft",
+      "hard"
+    ]
+  },
+  "podAntiAffinityPreset": {
+    "enum": [
+      "",
+      "soft",
+      "hard"
+    ]
+  },
+  "nodeAffinityPreset.type": {
+    "enum": [
+      "",
+      "soft",
+      "hard"
+    ]
+  },
+  "updateStrategy.type": {
+    "enum": [
+      "RollingUpdate",
+      "Recreate"
+    ]
+  },
+  "groupName": {
+    "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$"
+  },
+  "logLevel": {
+    "minimum": 0
+  },
+  "replicaCount": {
+    "minimum": 1
+  }
+}

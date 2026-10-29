@@ -21,3 +21,5 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           owner: Contentways
           repo: cert-manager-webhook-poweradmin
+          # version and appVersion of the chart follow the release
+          extra-files: deploy/charts/cert-manager-webhook-poweradmin/Chart.yaml

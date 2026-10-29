@@ -19,3 +19,7 @@ go.work.sum
 # Build and test output
 /bin/
 /_e2e/
+/.dist/
+
+# Helm dependencies, packaged by helm dependency build
+deploy/charts/*/charts/

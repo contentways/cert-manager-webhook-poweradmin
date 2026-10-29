@@ -35,3 +35,32 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ github.ref_name }}
+
+  # The chart is released in the version of the image it deploys.
+  chart:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      CHART: deploy/charts/cert-manager-webhook-poweradmin
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: v4.3.1
+      - name: Package and push the chart
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          registry="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts"
+          # the images annotation is a block scalar, which releaser-pleaser's markers cannot reach
+          sed -i -E "s|^(\s+image: ghcr\.io/[^:]+):.*$|\1:${version}|" "$CHART/Chart.yaml"
+          echo "$GH_TOKEN" | helm registry login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          helm dependency build "$CHART"
+          helm package "$CHART" --version "$version" --app-version "$version" --destination .dist
+          helm push ".dist/cert-manager-webhook-poweradmin-${version}.tgz" "oci://${registry}"
+          gh release upload "$GITHUB_REF_NAME" ".dist/cert-manager-webhook-poweradmin-${version}.tgz" --clobber

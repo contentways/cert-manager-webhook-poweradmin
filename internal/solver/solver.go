@@ -160,8 +160,7 @@ func (s *Solver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 
 	target, err := s.prepare(ctx, ch)
 	if err != nil {
-		var noAccess *accessError
-		if errors.As(err, &noAccess) {
+		if _, ok := errors.AsType[*accessError](err); ok {
 			klog.InfoS("skipping clean-up without access to the zone; remove the record by hand if it was presented",
 				"fqdn", normalize(ch.ResolvedFQDN), "namespace", ch.ResourceNamespace, "reason", err.Error())
 			return nil

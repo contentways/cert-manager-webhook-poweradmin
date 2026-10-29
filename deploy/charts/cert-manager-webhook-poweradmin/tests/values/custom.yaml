@@ -1,0 +1,25 @@
+groupName: acme.example.com
+fullnameOverride: poweradmin-webhook
+certManager:
+  namespace: security
+  serviceAccountName: cert-manager-controller
+replicaCount: 2
+pdb:
+  minAvailable: 1
+podAntiAffinityPreset: hard
+image:
+  digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+logLevel: 4
+extraArgs:
+  - --tls-min-version=VersionTLS13
+resources:
+  requests:
+    cpu: 20m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+service:
+  ports:
+    https: 8443
+commonLabels:
+  team: dns

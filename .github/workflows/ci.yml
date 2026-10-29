@@ -61,6 +61,63 @@ jobs:
         if: failure()
         run: tail -n 100 _e2e/*.log
 
+  chart-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Regenerate the parameter table and values schema
+        run: make chart-readme
+      - name: Fail on drift
+        run: git diff --exit-code -- deploy/charts/
+
+  chart:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        helm:
+          - v3.22.1
+          - v4.3.1
+    env:
+      CHART: deploy/charts/cert-manager-webhook-poweradmin
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ matrix.helm }}
+      - name: Lint
+        run: make chart-lint
+      - name: Render the test values and validate them
+        run: |
+          curl -fsSL https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          for f in "$CHART"/ci/*.yaml "$CHART"/tests/values/*.yaml; do
+            echo "== $f"
+            helm template test "$CHART" -f "$f" | ./kubeconform -strict -summary \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'
+          done
+      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+      - name: Build the image and load it into kind
+        run: |
+          make image TAG=ci
+          kind load docker-image ghcr.io/contentways/cert-manager-webhook-poweradmin:ci --name chart-testing
+      # the webhook needs cert-manager's CRDs and cainjector
+      - name: Install cert-manager
+        run: |
+          helm install cert-manager oci://quay.io/jetstack/charts/cert-manager --version v1.21.2 \
+            --namespace cert-manager --create-namespace --set crds.enabled=true --wait
+      - name: Install the chart
+        run: |
+          helm install webhook "$CHART" --namespace cert-manager \
+            --set image.tag=ci --set image.pullPolicy=Never --wait --timeout 5m
+          kubectl wait --for=condition=Available apiservice/v1alpha1.acme.contentways.org --timeout=120s
+      - name: Logs
+        if: failure()
+        run: kubectl -n cert-manager logs deploy/webhook-cert-manager-webhook-poweradmin --tail=100 || true
+
   image:
     runs-on: ubuntu-latest
     steps:

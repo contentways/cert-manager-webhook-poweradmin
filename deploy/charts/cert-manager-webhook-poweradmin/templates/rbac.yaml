@@ -1,0 +1,180 @@
+{{- $fullname := include "common.names.fullname" . }}
+{{- $clusterName := include "cmwp.clusterName" . }}
+{{- $namespace := include "common.names.namespace" . }}
+{{- $serviceAccount := include "cmwp.serviceAccountName" . }}
+# Lets the webhook read the request header CA of the kube-apiserver for authentication
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s:webhook-authentication-reader" $clusterName }}
+  namespace: kube-system
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount }}
+    namespace: {{ $namespace | quote }}
+---
+# Lets the webhook delegate authentication and authorization to the kube-apiserver
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s:auth-delegator" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount }}
+    namespace: {{ $namespace | quote }}
+---
+# The webhook's API server watches the API priority and fairness configuration
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s:flowcontrol" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+rules:
+  - apiGroups: ["flowcontrol.apiserver.k8s.io"]
+    resources: ["prioritylevelconfigurations", "flowschemas"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s:flowcontrol" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s:flowcontrol" $clusterName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount }}
+    namespace: {{ $namespace | quote }}
+---
+# Lets cert-manager send challenges to the webhook
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s:domain-solver" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+rules:
+  - apiGroups: [{{ .Values.groupName | quote }}]
+    resources: ["*"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s:domain-solver" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s:domain-solver" $clusterName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.certManager.serviceAccountName }}
+    namespace: {{ .Values.certManager.namespace | quote }}
+---
+# Read access to the Secrets with the Poweradmin API keys
+{{- $secretRule := dict "apiGroups" (list "") "resources" (list "secrets") "verbs" (list "get") }}
+{{- if .Values.secretAccess.resourceNames }}
+{{- $_ := set $secretRule "resourceNames" .Values.secretAccess.resourceNames }}
+{{- end }}
+{{- if not .Values.secretAccess.namespaces }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ printf "%s:secret-reader" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+rules: {{- toYaml (list $secretRule) | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s:secret-reader" $clusterName }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" .Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if .Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" .Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ printf "%s:secret-reader" $clusterName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount }}
+    namespace: {{ $namespace | quote }}
+{{- else }}
+{{- range $index, $ns := uniq .Values.secretAccess.namespaces }}
+{{- if $index }}
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s:secret-reader" $clusterName }}
+  namespace: {{ $ns | quote }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" $.Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if $.Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" $.Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+rules: {{- toYaml (list $secretRule) | nindent 2 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s:secret-reader" $clusterName }}
+  namespace: {{ $ns | quote }}
+  labels: {{- include "common.labels.standard" (dict "customLabels" $.Values.commonLabels "context" $) | nindent 4 }}
+    app.kubernetes.io/component: webhook
+  {{- if $.Values.commonAnnotations }}
+  annotations: {{- include "common.tplvalues.render" (dict "value" $.Values.commonAnnotations "context" $) | nindent 4 }}
+  {{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s:secret-reader" $clusterName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $serviceAccount }}
+    namespace: {{ $namespace | quote }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,693 @@
+{
+    "title": "Chart Values",
+    "type": "object",
+    "properties": {
+        "global": {
+            "type": "object",
+            "properties": {
+                "imageRegistry": {
+                    "type": "string",
+                    "description": "Global container image registry",
+                    "default": ""
+                },
+                "imagePullSecrets": {
+                    "type": "array",
+                    "description": "Global registry secret names as an array",
+                    "default": [],
+                    "items": {}
+                },
+                "compatibility": {
+                    "type": "object",
+                    "properties": {
+                        "openshift": {
+                            "type": "object",
+                            "properties": {
+                                "adaptSecurityContext": {
+                                    "type": "string",
+                                    "description": "Drop fixed runAsUser, runAsGroup and fsGroup so the restricted SCC can assign its own (auto: only on OpenShift, force, disabled)",
+                                    "default": "auto",
+                                    "enum": [
+                                        "auto",
+                                        "force",
+                                        "disabled"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "kubeVersion": {
+            "type": "string",
+            "description": "Override the Kubernetes version detected from the cluster",
+            "default": ""
+        },
+        "apiVersions": {
+            "type": "array",
+            "description": "Override the API versions detected from the cluster (used by helm template)",
+            "default": [],
+            "items": {}
+        },
+        "nameOverride": {
+            "type": "string",
+            "description": "Replaces the chart name in the object names",
+            "default": ""
+        },
+        "fullnameOverride": {
+            "type": "string",
+            "description": "Replaces the generated base name of all objects",
+            "default": ""
+        },
+        "namespaceOverride": {
+            "type": "string",
+            "description": "Namespace for all objects instead of the release namespace",
+            "default": ""
+        },
+        "commonLabels": {
+            "type": "object",
+            "description": "Labels set on every object of the release",
+            "default": {}
+        },
+        "commonAnnotations": {
+            "type": "object",
+            "description": "Annotations set on every object of the release",
+            "default": {}
+        },
+        "extraDeploy": {
+            "type": "array",
+            "description": "Additional manifests installed with the release; may contain templates",
+            "default": [],
+            "items": {}
+        },
+        "groupName": {
+            "type": "string",
+            "description": "API group of the webhook; issuers reference it as solvers[].dns01.webhook.groupName",
+            "default": "acme.contentways.org",
+            "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$"
+        },
+        "certManager": {
+            "type": "object",
+            "properties": {
+                "namespace": {
+                    "type": "string",
+                    "description": "Namespace of cert-manager",
+                    "default": "cert-manager"
+                },
+                "serviceAccountName": {
+                    "type": "string",
+                    "description": "ServiceAccount of the cert-manager controller",
+                    "default": "cert-manager"
+                }
+            }
+        },
+        "secretAccess": {
+            "type": "object",
+            "properties": {
+                "namespaces": {
+                    "type": "array",
+                    "description": "Namespaces whose Secrets the webhook may read; empty grants access in all namespaces",
+                    "default": [],
+                    "items": {}
+                },
+                "resourceNames": {
+                    "type": "array",
+                    "description": "Names of the Secrets the webhook may read; empty allows every Secret in those namespaces",
+                    "default": [],
+                    "items": {}
+                }
+            }
+        },
+        "pki": {
+            "type": "object",
+            "properties": {
+                "caDuration": {
+                    "type": "string",
+                    "description": "Lifetime of the CA certificate",
+                    "default": "43800h"
+                },
+                "servingCertificateDuration": {
+                    "type": "string",
+                    "description": "Lifetime of the serving certificate",
+                    "default": "8760h"
+                }
+            }
+        },
+        "logLevel": {
+            "type": "number",
+            "description": "klog verbosity of the webhook; presented and cleaned up records are logged at every level",
+            "default": 2,
+            "minimum": 0
+        },
+        "image": {
+            "type": "object",
+            "properties": {
+                "registry": {
+                    "type": "string",
+                    "description": "Webhook image registry",
+                    "default": "ghcr.io"
+                },
+                "repository": {
+                    "type": "string",
+                    "description": "Webhook image repository",
+                    "default": "contentways/cert-manager-webhook-poweradmin"
+                },
+                "digest": {
+                    "type": "string",
+                    "description": "Webhook image digest in the form sha256:aa.... Wins over the tag",
+                    "default": ""
+                },
+                "pullPolicy": {
+                    "type": "string",
+                    "description": "Webhook image pull policy",
+                    "default": "IfNotPresent",
+                    "enum": [
+                        "Always",
+                        "IfNotPresent",
+                        "Never"
+                    ]
+                },
+                "pullSecrets": {
+                    "type": "array",
+                    "description": "Webhook image pull secrets",
+                    "default": [],
+                    "items": {}
+                }
+            }
+        },
+        "replicaCount": {
+            "type": "number",
+            "description": "Number of webhook replicas",
+            "default": 1,
+            "minimum": 1
+        },
+        "revisionHistoryLimit": {
+            "type": "number",
+            "description": "Number of old ReplicaSets to retain",
+            "default": 10
+        },
+        "updateStrategy": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "Deployment strategy type",
+                    "default": "RollingUpdate",
+                    "enum": [
+                        "RollingUpdate",
+                        "Recreate"
+                    ]
+                }
+            }
+        },
+        "containerPorts": {
+            "type": "object",
+            "properties": {
+                "https": {
+                    "type": "number",
+                    "description": "HTTPS port of the webhook's API server",
+                    "default": 8443
+                }
+            }
+        },
+        "command": {
+            "type": "array",
+            "description": "Override the default container command",
+            "default": [],
+            "items": {}
+        },
+        "args": {
+            "type": "array",
+            "description": "Override the default container args",
+            "default": [],
+            "items": {}
+        },
+        "extraArgs": {
+            "type": "array",
+            "description": "Extra arguments for the webhook, e.g. --tls-min-version=VersionTLS13",
+            "default": [],
+            "items": {}
+        },
+        "extraEnvVars": {
+            "type": "array",
+            "description": "Extra environment variables for the webhook container",
+            "default": [],
+            "items": {}
+        },
+        "extraEnvVarsCM": {
+            "type": "string",
+            "description": "Name of a ConfigMap whose keys become environment variables",
+            "default": ""
+        },
+        "extraEnvVarsSecret": {
+            "type": "string",
+            "description": "Name of a Secret whose keys become environment variables",
+            "default": ""
+        },
+        "podSecurityContext": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable the pod security context",
+                    "default": true
+                },
+                "fsGroupChangePolicy": {
+                    "type": "string",
+                    "description": "When to change volume ownership",
+                    "default": "Always"
+                },
+                "sysctls": {
+                    "type": "array",
+                    "description": "Kernel settings via sysctl",
+                    "default": [],
+                    "items": {}
+                },
+                "supplementalGroups": {
+                    "type": "array",
+                    "description": "Additional groups for the first process",
+                    "default": [],
+                    "items": {}
+                },
+                "fsGroup": {
+                    "type": "number",
+                    "description": "Group owning the volumes",
+                    "default": 65532
+                },
+                "seccompProfile": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Seccomp profile",
+                            "default": "RuntimeDefault"
+                        }
+                    }
+                }
+            }
+        },
+        "containerSecurityContext": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Enable the container security context",
+                    "default": true
+                },
+                "seLinuxOptions": {
+                    "type": "object",
+                    "description": "SELinux options",
+                    "default": {}
+                },
+                "runAsUser": {
+                    "type": "number",
+                    "description": "User ID",
+                    "default": 65532
+                },
+                "runAsGroup": {
+                    "type": "number",
+                    "description": "Group ID",
+                    "default": 65532
+                },
+                "runAsNonRoot": {
+                    "type": "boolean",
+                    "description": "Require a non-root user",
+                    "default": true
+                },
+                "privileged": {
+                    "type": "boolean",
+                    "description": "Run privileged",
+                    "default": false
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean",
+                    "description": "Mount the root filesystem read-only",
+                    "default": true
+                },
+                "allowPrivilegeEscalation": {
+                    "type": "boolean",
+                    "description": "Allow privilege escalation",
+                    "default": false
+                },
+                "capabilities": {
+                    "type": "object",
+                    "properties": {
+                        "drop": {
+                            "type": "array",
+                            "description": "Capabilities to drop",
+                            "default": [
+                                "ALL"
+                            ],
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "seccompProfile": {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "description": "Seccomp profile",
+                            "default": "RuntimeDefault"
+                        }
+                    }
+                }
+            }
+        },
+        "resourcesPreset": {
+            "type": "string",
+            "description": "Resources preset (none, nano, micro, small, medium, large, xlarge, 2xlarge); ignored when resources is set",
+            "default": "nano",
+            "enum": [
+                "none",
+                "nano",
+                "micro",
+                "small",
+                "medium",
+                "large",
+                "xlarge",
+                "2xlarge"
+            ]
+        },
+        "resources": {
+            "type": "object",
+            "description": "Container requests and limits, e.g. requests.cpu: 50m, limits.memory: 128Mi",
+            "default": {}
+        },
+        "livenessProbe": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Run a liveness probe",
+                    "default": true
+                },
+                "initialDelaySeconds": {
+                    "type": "number",
+                    "description": "Seconds after container start before the first liveness check",
+                    "default": 5
+                },
+                "periodSeconds": {
+                    "type": "number",
+                    "description": "Seconds between liveness checks",
+                    "default": 10
+                },
+                "timeoutSeconds": {
+                    "type": "number",
+                    "description": "Seconds after which a liveness check times out",
+                    "default": 5
+                },
+                "failureThreshold": {
+                    "type": "number",
+                    "description": "Failed liveness checks in a row before the probe fails",
+                    "default": 6
+                },
+                "successThreshold": {
+                    "type": "number",
+                    "description": "Successful liveness checks in a row before the probe passes again",
+                    "default": 1
+                }
+            }
+        },
+        "readinessProbe": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "description": "Run a readiness probe",
+                    "default": true
+                },
+                "initialDelaySeconds": {
+                    "type": "number",
+                    "description": "Seconds after container start before the first readiness check",
+                    "default": 5
+                },
+                "periodSeconds": {
+                    "type": "number",
+                    "description": "Seconds between readiness checks",
+                    "default": 10
+                },
+                "timeoutSeconds": {
+                    "type": "number",
+                    "description": "Seconds after which a readiness check times out",
+                    "default": 5
+                },
+                "failureThreshold": {
+                    "type": "number",
+                    "description": "Failed readiness checks in a row before the probe fails",
+                    "default": 3
+                },
+                "successThreshold": {
+                    "type": "number",
+                    "description": "Successful readiness checks in a row before the probe passes again",
+                    "default": 1
+                }
+            }
+        },
+        "customLivenessProbe": {
+            "type": "object",
+            "description": "Complete liveness probe that replaces the built-in one",
+            "default": {}
+        },
+        "customReadinessProbe": {
+            "type": "object",
+            "description": "Complete readiness probe that replaces the built-in one",
+            "default": {}
+        },
+        "lifecycleHooks": {
+            "type": "object",
+            "description": "Lifecycle hooks for the webhook container",
+            "default": {}
+        },
+        "automountServiceAccountToken": {
+            "type": "boolean",
+            "description": "Mount the service account token in the pod (the webhook needs it to read Secrets)",
+            "default": true
+        },
+        "hostAliases": {
+            "type": "array",
+            "description": "Webhook pod host aliases",
+            "default": [],
+            "items": {}
+        },
+        "podLabels": {
+            "type": "object",
+            "description": "Extra labels for webhook pods",
+            "default": {}
+        },
+        "podAnnotations": {
+            "type": "object",
+            "description": "Annotations for webhook pods",
+            "default": {}
+        },
+        "podAffinityPreset": {
+            "type": "string",
+            "description": "Pod affinity preset (soft or hard). Ignored if affinity is set",
+            "default": "",
+            "enum": [
+                "",
+                "soft",
+                "hard"
+            ]
+        },
+        "podAntiAffinityPreset": {
+            "type": "string",
+            "description": "Pod anti-affinity preset (soft or hard). Ignored if affinity is set",
+            "default": "soft",
+            "enum": [
+                "",
+                "soft",
+                "hard"
+            ]
+        },
+        "nodeAffinityPreset": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "Node affinity preset type (soft or hard). Ignored if affinity is set",
+                    "default": "",
+                    "enum": [
+                        "",
+                        "soft",
+                        "hard"
+                    ]
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Node label key to match",
+                    "default": ""
+                },
+                "values": {
+                    "type": "array",
+                    "description": "Node label values to match",
+                    "default": [],
+                    "items": {}
+                }
+            }
+        },
+        "affinity": {
+            "type": "object",
+            "description": "Affinity for webhook pods (evaluated as a template)",
+            "default": {}
+        },
+        "nodeSelector": {
+            "type": "object",
+            "description": "Node labels for webhook pods (evaluated as a template)",
+            "default": {}
+        },
+        "tolerations": {
+            "type": "array",
+            "description": "Tolerations for webhook pods (evaluated as a template)",
+            "default": [],
+            "items": {}
+        },
+        "topologySpreadConstraints": {
+            "type": "array",
+            "description": "Topology spread constraints for webhook pods (evaluated as a template)",
+            "default": [],
+            "items": {}
+        },
+        "priorityClassName": {
+            "type": "string",
+            "description": "Webhook pods' priorityClassName",
+            "default": ""
+        },
+        "schedulerName": {
+            "type": "string",
+            "description": "Scheduler for the pods; empty means the default scheduler",
+            "default": ""
+        },
+        "terminationGracePeriodSeconds": {
+            "type": [
+                "string",
+                "integer"
+            ],
+            "description": "Seconds webhook pods need to terminate gracefully",
+            "default": ""
+        },
+        "extraVolumes": {
+            "type": "array",
+            "description": "Optionally specify extra list of additional volumes for the webhook pods",
+            "default": [],
+            "items": {}
+        },
+        "extraVolumeMounts": {
+            "type": "array",
+            "description": "Optionally specify extra list of additional volumeMounts for the webhook container",
+            "default": [],
+            "items": {}
+        },
+        "sidecars": {
+            "type": "array",
+            "description": "Add additional sidecar containers to the webhook pods",
+            "default": [],
+            "items": {}
+        },
+        "initContainers": {
+            "type": "array",
+            "description": "Add additional init containers to the webhook pods",
+            "default": [],
+            "items": {}
+        },
+        "pdb": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create a PodDisruptionBudget",
+                    "default": true
+                },
+                "minAvailable": {
+                    "type": [
+                        "string",
+                        "integer"
+                    ],
+                    "description": "Pods (number or percentage) that must stay available during voluntary disruptions",
+                    "default": ""
+                },
+                "maxUnavailable": {
+                    "type": [
+                        "string",
+                        "integer"
+                    ],
+                    "description": "Maximum number/percentage of unavailable pods; defaults to 1 when both are empty",
+                    "default": ""
+                }
+            }
+        },
+        "service": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "description": "Type of the Service",
+                    "default": "ClusterIP",
+                    "enum": [
+                        "ClusterIP",
+                        "NodePort",
+                        "LoadBalancer"
+                    ]
+                },
+                "ports": {
+                    "type": "object",
+                    "properties": {
+                        "https": {
+                            "type": "number",
+                            "description": "HTTPS port of the Service",
+                            "default": 443
+                        }
+                    }
+                },
+                "clusterIP": {
+                    "type": "string",
+                    "description": "Service Cluster IP",
+                    "default": ""
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Additional custom annotations for the Service",
+                    "default": {}
+                },
+                "ipFamilyPolicy": {
+                    "type": "string",
+                    "description": "IP family policy of the Service",
+                    "default": ""
+                },
+                "ipFamilies": {
+                    "type": "array",
+                    "description": "IP families of the Service",
+                    "default": [],
+                    "items": {}
+                }
+            }
+        },
+        "serviceAccount": {
+            "type": "object",
+            "properties": {
+                "create": {
+                    "type": "boolean",
+                    "description": "Create a ServiceAccount",
+                    "default": true
+                },
+                "name": {
+                    "type": "string",
+                    "description": "Name of the ServiceAccount; generated from the fullname when empty",
+                    "default": ""
+                },
+                "automountServiceAccountToken": {
+                    "type": "boolean",
+                    "description": "Automount the token of the created ServiceAccount",
+                    "default": false
+                },
+                "annotations": {
+                    "type": "object",
+                    "description": "Annotations for the ServiceAccount",
+                    "default": {}
+                }
+            }
+        }
+    }
+}

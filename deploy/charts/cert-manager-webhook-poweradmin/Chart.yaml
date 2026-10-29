@@ -1,0 +1,34 @@
+apiVersion: v2
+name: cert-manager-webhook-poweradmin
+description: cert-manager DNS01 webhook that solves ACME challenges through the Poweradmin API.
+type: application
+# version and appVersion follow the webhook release (releaser-pleaser updates them in the release PR)
+version: 0.1.0 # x-releaser-pleaser-version
+appVersion: 0.1.0 # x-releaser-pleaser-version
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/contentways/cert-manager-webhook-poweradmin
+icon: https://raw.githubusercontent.com/poweradmin/poweradmin/master/assets/logo.png
+sources:
+  - https://github.com/contentways/cert-manager-webhook-poweradmin/tree/main/deploy/charts/cert-manager-webhook-poweradmin
+keywords:
+  - cert-manager
+  - acme
+  - dns01
+  - poweradmin
+  - powerdns
+maintainers:
+  - name: Patrick Omland
+    email: info@contentways.org
+    url: https://github.com/pomland-94
+dependencies:
+  - name: common
+    version: 1.x.x
+    repository: file://../common
+    tags:
+      - contentways-common
+annotations:
+  category: Security
+  licenses: Apache-2.0
+  images: |
+    - name: cert-manager-webhook-poweradmin
+      image: ghcr.io/contentways/cert-manager-webhook-poweradmin:0.1.0

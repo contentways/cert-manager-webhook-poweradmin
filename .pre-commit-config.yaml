@@ -11,6 +11,8 @@ repos:
       - id: destroyed-symlinks
       - id: check-json
       - id: check-yaml
+        # Helm templates are not plain YAML
+        exclude: ^deploy/charts/[^/]+/templates/
       - id: check-toml
       - id: check-merge-conflict
       - id: end-of-file-fixer

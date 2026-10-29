@@ -17,8 +17,9 @@ Tested with Poweradmin 4.5.0 and PowerDNS 4.8.
 
 ## Installation
 
-Install cert-manager first, then the webhook with its Helm chart from
-[contentways/helm-charts](https://github.com/contentways/helm-charts):
+Install cert-manager first, then the webhook with its Helm chart. The chart lives
+in [deploy/charts](deploy/charts/cert-manager-webhook-poweradmin) and is
+published with every release, in the same version as the image:
 
 ```sh
 helm install cert-manager-webhook-poweradmin \
@@ -159,6 +160,8 @@ make test               # unit tests
 make lint               # golangci-lint
 make test-conformance   # cert-manager conformance suite, see below
 make image              # container image
+make chart-lint         # helm lint of the chart
+make chart-readme       # regenerate the chart's parameter table and values schema (needs npx)
 ```
 
 `make test-conformance` starts Poweradmin and PowerDNS on a shared SQLite

@@ -1,0 +1,4 @@
+global:
+  compatibility:
+    openshift:
+      adaptSecurityContext: force
